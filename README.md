@@ -149,3 +149,6 @@ Fix: accountability and infrastructure investment.
 
 The right intervention only becomes clear when you correctly
 identify which type of funnel you are analysing.
+
+## 🚀 Live Demo
+[View Live Dashboard](https://funnel-analysis-project-npk.streamlit.app)
