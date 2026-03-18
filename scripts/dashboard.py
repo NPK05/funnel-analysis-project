@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 from scipy.stats import norm
+import requests
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -1009,61 +1010,246 @@ else:
 
     # ── TAB 3 ─────────────────────────────────────────────────────────────
     with t3:
-        states = ['AL','MA','PI','CE','SE','BA','RJ','TO','PA','ES','MS','PB','RN','PE',
-                  'SC','GO','DF','RS','MT','SP','MG','PR','RO']
-        late_r = [23.9,19.7,16.0,15.3,15.2,14.0,13.5,12.8,12.4,12.2,11.6,11.0,10.8,10.8,
-                  9.8,8.2,7.1,7.1,6.8,5.9,5.6,5.0,2.9]
-        scores_s=[3.85,3.83,3.99,3.94,3.91,3.93,3.97,4.15,3.91,4.08,4.16,4.08,4.15,4.08,
-                  4.13,4.11,4.13,4.18,4.15,4.25,4.19,4.24,4.17]
-        orders_s=[397,717,476,1279,335,3256,12350,274,946,1995,701,517,474,1593,
-                  2219,1253,1065,5345,886,40501,11354,4923,243]
+        states = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS',
+                  'MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC',
+                  'SE','SP','TO']
+        late_r_all = [5.0,23.9,4.1,5.0,14.0,15.3,7.1,12.2,8.2,19.7,5.6,11.6,
+                      6.8,12.4,11.0,10.8,16.0,5.0,13.5,10.8,2.9,5.0,7.1,9.8,
+                      15.2,5.9,12.8]
+        scores_all = [4.10,3.85,4.24,4.10,3.93,3.94,4.13,4.08,4.11,3.83,4.19,4.16,
+                      4.15,3.91,4.08,4.08,3.99,4.24,3.97,4.15,4.17,4.10,4.18,4.13,
+                      3.91,4.25,4.15]
+        orders_all = [80,397,145,50,3256,1279,1065,1995,1253,717,11354,701,
+                      886,946,517,1593,476,4923,12350,474,243,50,5345,2219,
+                      335,40501,274]
 
-        df_s = pd.DataFrame({'state':states,'late_rate':late_r,
-                             'avg_score':scores_s,'orders':orders_s})
-        df_s = df_s.sort_values('late_rate', ascending=True)
+        # map state codes to ISO format for Plotly
+        br_iso = {s: f'BR-{s}' for s in states}
+        df_map = pd.DataFrame({
+            'state'    : states,
+            'iso'      : [br_iso[s] for s in states],
+            'late_rate': late_r_all,
+            'avg_score': scores_all,
+            'orders'   : orders_all
+        })
 
-        c1, c2 = st.columns([1,1])
+        # ── Full-width choropleth map ──
+        st.markdown('<div class="section-header">Late Delivery Rate — Brazil Choropleth Map</div>',
+                    unsafe_allow_html=True)
+
+        # ── Improved Scattergeo bubble map ──────────────────────────────
+        state_coords = {
+            'AC':(-9.02,-70.81),'AL':(-9.57,-36.78),'AM':(-3.47,-65.10),
+            'AP':(1.41,-51.77), 'BA':(-12.58,-41.70),'CE':(-5.50,-39.32),
+            'DF':(-15.78,-47.93),'ES':(-19.19,-40.34),'GO':(-15.83,-49.61),
+            'MA':(-5.42,-45.44),'MG':(-18.51,-44.56),'MS':(-20.77,-54.79),
+            'MT':(-12.64,-55.42),'PA':(-3.79,-52.48),'PB':(-7.28,-36.72),
+            'PE':(-8.38,-37.86),'PI':(-7.72,-42.73),'PR':(-24.89,-51.55),
+            'RJ':(-22.25,-43.38),'RN':(-5.81,-36.59),'RO':(-10.83,-63.34),
+            'RR':(2.72,-61.38), 'RS':(-30.17,-53.50),'SC':(-27.45,-50.95),
+            'SE':(-10.57,-37.45),'SP':(-22.25,-48.50),'TO':(-10.18,-48.33)
+        }
+        df_map["lat"] = df_map["state"].map(lambda s: state_coords.get(s,(0,0))[0])
+        df_map["lon"] = df_map["state"].map(lambda s: state_coords.get(s,(0,0))[1])
+        df_map["hover"] = df_map.apply(
+            lambda r: (
+                f"<b style='font-size:14px'>{r['state']}</b><br>"
+                f"<span style='color:#e05c3a'>Late rate: {r['late_rate']:.1f}%</span><br>"
+                f"Avg score: {r['avg_score']:.2f} ⭐<br>"
+                f"Orders: {r['orders']:,}"
+            ), axis=1
+        )
+
+        max_orders = df_map["orders"].max()
+        # tighter bubble range — large states don't overwhelm
+        df_map["bubble"] = 12 + (df_map["orders"] / max_orders) ** 0.55 * 38
+
+        fig_map = go.Figure()
+
+        # background halo for worst states (>15% late rate)
+        worst = df_map[df_map["late_rate"] > 15]
+        fig_map.add_trace(go.Scattergeo(
+            lat=worst["lat"], lon=worst["lon"],
+            mode="markers", hoverinfo="skip", showlegend=False,
+            marker=dict(
+                size=worst["bubble"] + 10,
+                color="rgba(153,27,27,0.18)",
+                line=dict(width=0)
+            )
+        ))
+
+        # main bubbles
+        fig_map.add_trace(go.Scattergeo(
+            lat=df_map["lat"], lon=df_map["lon"],
+            text=df_map["hover"], hoverinfo="text",
+            mode="markers",
+            marker=dict(
+                size=df_map["bubble"],
+                color=df_map["late_rate"],
+                colorscale=[
+                    [0.00, "#064e3b"],
+                    [0.20, "#0d9488"],
+                    [0.36, "#6ee7b7"],
+                    [0.48, "#fde68a"],
+                    [0.64, "#f97316"],
+                    [0.80, "#dc2626"],
+                    [1.00, "#7f1d1d"]
+                ],
+                cmin=0, cmax=26,
+                colorbar=dict(
+                    title=dict(
+                        text="Late<br>Rate %",
+                        font=dict(size=11, color="#334155")
+                    ),
+                    ticksuffix="%",
+                    thickness=16, len=0.65,
+                    x=0.98, y=0.5,
+                    bgcolor="rgba(255,255,255,0.85)",
+                    bordercolor="#e2e8f0", borderwidth=1,
+                    tickfont=dict(size=10, color="#475569")
+                ),
+                line=dict(width=1.8, color="white"),
+                opacity=0.92
+            )
+        ))
+
+        # state code labels — white text on bubbles
+        fig_map.add_trace(go.Scattergeo(
+            lat=df_map["lat"], lon=df_map["lon"],
+            text=df_map["state"],
+            mode="text", hoverinfo="skip", showlegend=False,
+            textfont=dict(
+                size=8.5, color="white",
+                family="DM Sans"
+            )
+        ))
+
+        fig_map.update_layout(
+            title=dict(
+                text=("Late Delivery Rate — Brazil State Map<br>"
+                      "<sup>Bubble size = order volume  │  Color intensity = late rate"
+                      "  │  Hover any state for details</sup>"),
+                x=0.5, xanchor="center",
+                font=dict(family="DM Serif Display", size=18, color="#1a2744")
+            ),
+            geo=dict(
+                scope="south america",
+                showframe=False,
+                resolution=50,
+                showcoastlines=True,  coastlinecolor="#94a3b8",  coastlinewidth=0.8,
+                showland=True,        landcolor="#f8fafc",
+                showocean=True,       oceancolor="#e0f2fe",
+                showlakes=True,       lakecolor="#bae6fd",
+                showcountries=True,   countrycolor="#94a3b8",   countrywidth=0.8,
+                showsubunits=True,    subunitcolor="#e2e8f0",
+                bgcolor="rgba(0,0,0,0)",
+                projection_type="mercator",
+                center=dict(lat=-14.5, lon=-51),
+                lataxis=dict(range=[-34, 5.5]),
+                lonaxis=dict(range=[-74, -29])
+            ),
+            font=dict(family="DM Sans", size=12, color="#334155"),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            height=560,
+            margin=dict(t=85, b=15, l=10, r=80),
+            showlegend=False,
+            hoverlabel=dict(
+                bgcolor="white",
+                bordercolor="#e2e8f0",
+                font=dict(family="DM Sans", size=12, color="#1a2744")
+            )
+        )
+        st.plotly_chart(fig_map, use_container_width=True)
+
+        # quick legend row
+        st.markdown("""
+        <div style="display:flex;gap:2rem;padding:0.4rem 0.5rem;
+                    background:#f8fafc;border-radius:8px;
+                    font-size:0.8rem;color:#475569;margin-top:-0.5rem">
+            <span>&#9679; <span style="color:#064e3b">&#9632;</span> &lt;6% late — best</span>
+            <span>&#9679; <span style="color:#0d9488">&#9632;</span> 6-10% late — good</span>
+            <span>&#9679; <span style="color:#f97316">&#9632;</span> 10-16% late — concern</span>
+            <span>&#9679; <span style="color:#7f1d1d">&#9632;</span> &gt;16% late — critical</span>
+            <span style="margin-left:auto">Bubble size = order volume</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Two bar charts below map ──
+        df_s = df_map.copy().sort_values('late_rate', ascending=True)
+
+        c1, c2 = st.columns([1, 1])
         with c1:
-            st.markdown('<div class="section-header">Late Delivery Rate by State</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Late Delivery Rate by State (ranked)</div>',
+                        unsafe_allow_html=True)
             s_colors = ['#991b1b' if v>15 else '#e05c3a' if v>10 else
-                       '#d97706' if v>7 else '#0d9488' for v in df_s['late_rate']]
-            fig = go.Figure(go.Bar(
+                        '#d97706' if v>7 else '#0d9488'
+                        for v in df_s['late_rate']]
+            fig_b1 = go.Figure(go.Bar(
                 y=df_s['state'], x=df_s['late_rate'],
                 orientation='h', marker_color=s_colors, opacity=0.88,
                 text=[f'{v:.1f}%' for v in df_s['late_rate']],
                 textposition='outside', textfont=dict(size=9),
-                customdata=df_s['orders'].values,
-                hovertemplate='<b>%{y}</b><br>Late rate: %{x:.1f}%<br>Orders: %{customdata:,}<extra></extra>'
+                customdata=np.column_stack([df_s['orders'], df_s['avg_score']]),
+                hovertemplate=(
+                    '<b>%{y}</b><br>'
+                    'Late rate: %{x:.1f}%<br>'
+                    'Orders: %{customdata[0]:,.0f}<br>'
+                    'Avg score: %{customdata[1]:.2f}'
+                    '<extra></extra>'
+                )
             ))
-            fig.add_vline(x=5.9, line_dash='dash', line_color='#0d9488', line_width=1.5,
-                         annotation_text='SP 5.9%', annotation_font_color='#0d9488',
-                         annotation_position='top right')
-            plotly_layout(fig, 'Late Rate by State',
-                         'Chi-square vs SP · All differences p<0.001 except MG (p=0.254)', h=540)
-            fig.update_xaxes(range=[0,30], ticksuffix='%')
-            st.plotly_chart(fig, use_container_width=True)
+            fig_b1.add_vline(x=5.9, line_dash='dash', line_color='#0d9488',
+                             line_width=1.5,
+                             annotation_text='SP baseline 5.9%',
+                             annotation_font_color='#0d9488',
+                             annotation_position='top right')
+            plotly_layout(fig_b1, 'Late Rate Ranking',
+                         'All vs SP differences p<0.001 except MG (p=0.254)', h=580)
+            fig_b1.update_xaxes(range=[0, 30], ticksuffix='%')
+            st.plotly_chart(fig_b1, use_container_width=True)
 
         with c2:
-            st.markdown('<div class="section-header">Avg Review Score by State</div>', unsafe_allow_html=True)
-            sc_colors = ['#0d9488' if v>=4.2 else '#d97706' if v>=4.0 else '#e05c3a'
-                        for v in df_s['avg_score']]
-            fig2 = go.Figure(go.Bar(
+            st.markdown('<div class="section-header">Avg Review Score by State (same order)</div>',
+                        unsafe_allow_html=True)
+            sc_colors = ['#0d9488' if v >= 4.2 else '#d97706' if v >= 4.0 else '#e05c3a'
+                         for v in df_s['avg_score']]
+            fig_b2 = go.Figure(go.Bar(
                 y=df_s['state'], x=df_s['avg_score'],
                 orientation='h', marker_color=sc_colors, opacity=0.88,
                 text=[f'{v:.2f}' for v in df_s['avg_score']],
-                textposition='outside', textfont=dict(size=9)
+                textposition='outside', textfont=dict(size=9),
+                hovertemplate=(
+                    '<b>%{y}</b><br>'
+                    'Avg score: %{x:.2f}'
+                    '<extra></extra>'
+                )
             ))
-            fig2.add_vline(x=4.16, line_dash='dash', line_color='#94a3b8',
-                          annotation_text='Overall 4.16', annotation_font_color='#94a3b8')
-            plotly_layout(fig2, 'Avg Review Score by State',
-                         'Same state order — pattern mirrors late rate', h=540)
-            fig2.update_xaxes(range=[3.5,4.5])
-            st.plotly_chart(fig2, use_container_width=True)
+            fig_b2.add_vline(x=4.16, line_dash='dash', line_color='#94a3b8',
+                             annotation_text='Overall avg 4.16',
+                             annotation_font_color='#94a3b8')
+            plotly_layout(fig_b2, 'Review Score Ranking',
+                         'Pattern mirrors late rate — high late rate = low score', h=580)
+            fig_b2.update_xaxes(range=[3.5, 4.5])
+            st.plotly_chart(fig_b2, use_container_width=True)
 
         st.markdown(
-            finding('<strong>AL (23.9%) has 4x the late rate of SP (5.9%)</strong> — northeast Brazil has a structural logistics infrastructure gap. Both differences are statistically proven (p<0.001).') +
-            finding('<strong>MG (5.6%) is statistically indistinguishable from SP (p=0.254)</strong> — shares its logistics infrastructure. MG is the model for other states to replicate.', 'warn') +
-            finding('<strong>RJ (13.5%, 12,350 orders)</strong> is the highest-priority fix — largest volume at a high late rate. Fixing RJ alone would rescue ~1,670 late orders.', 'alert'),
+            finding(
+                '<strong>AL (23.9%) has 4x the late rate of SP (5.9%)</strong> — '
+                'northeast Brazil has a structural logistics gap. '
+                'All differences vs SP statistically proven (p<0.001).'
+            ) +
+            finding(
+                '<strong>MG (5.6%) is statistically same as SP (p=0.254)</strong> — '
+                'shares SP logistics infrastructure. Model state for others to replicate.',
+                'warn'
+            ) +
+            finding(
+                '<strong>RJ (13.5%, 12,350 orders)</strong> is the highest-priority fix '
+                '— largest order volume at a high late rate. '
+                'Fixing RJ rescues ~1,670 late orders worth R$269K.',
+                'alert'
+            ),
             unsafe_allow_html=True
         )
 
