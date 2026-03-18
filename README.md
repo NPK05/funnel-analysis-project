@@ -3,9 +3,9 @@
 Multi-company funnel analysis across three real-world datasets
 representing three distinct funnel archetypes.
 
-**Google Merchandise Store** — conversion funnel  
-**Instacart** — retention funnel  
-**Olist Brazilian E-Commerce** — fulfilment funnel
+**Google Merchandise Store** --> conversion funnel  
+**Instacart** --> retention funnel  
+**Olist Brazilian E-Commerce** --> fulfilment funnel
 
 ---
 
@@ -40,8 +40,8 @@ representing three distinct funnel archetypes.
 
 ### Google Merchandise Store
 - Overall CVR: **32.4%** (ATC → Purchase)
-- Largest drop-off: **ATC → Checkout at 49%** — the primary leak
-- Device CVR: Mobile 28.25% vs Desktop 27.28% — **NOT significant** (p=0.208)
+- Largest drop-off: **ATC → Checkout at 49%** the primary leak
+- Device CVR: Mobile 28.25% vs Desktop 27.28% **NOT significant** (p=0.208)
 - Best category: Campus Collection **3.6% CVR** vs Apparel 1.8%
 - Monthly cohorts: November **71.4%** vs December **26.5%** (p<0.001)
 - Revenue leakage: **$552,179** over 3 months (~$2.2M annualized)
@@ -49,9 +49,9 @@ representing three distinct funnel archetypes.
 ### Instacart
 - Overall loyalty rate: **76.0%** CI [75.9%, 76.2%]
 - Steepest drop: order **4→5 loses 10.9%** of users
-- Weekly cadence loyalty: **81.0%** vs Monthly **59.3%** — 21.7pp gap (p=0.000000)
+- Weekly cadence loyalty: **81.0%** vs Monthly **59.3%** 21.7pp gap (p=0.000000)
 - Weekly users place **33.8 orders** on average vs 6.7 for monthly users
-- Babies department: **79.5% loyalty**, 19.3 avg orders — highest LTV
+- Babies department: **79.5% loyalty**, 19.3 avg orders highest LTV
 
 ### Olist
 - Fulfilment rate: **97.0%** CI [96.9%, 97.1%]
