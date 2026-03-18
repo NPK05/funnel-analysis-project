@@ -138,13 +138,13 @@ jupyter notebook
 The three datasets represent three fundamentally different
 funnel problems:
 
-**Conversion funnels** (Google Merch) — drop-off is a user decision.
+**Conversion funnels** (Google Merch) drop-off is a user decision.
 Fix: reduce friction at the decision point.
 
-**Retention funnels** (Instacart) — drop-off is habit failure.
+**Retention funnels** (Instacart) drop-off is habit failure.
 Fix: behavioural nudges before the habit forms.
 
-**Fulfilment funnels** (Olist) — drop-off is operational failure.
+**Fulfilment funnels** (Olist) drop-off is operational failure.
 Fix: accountability and infrastructure investment.
 
 The right intervention only becomes clear when you correctly
